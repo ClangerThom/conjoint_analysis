@@ -1,8 +1,7 @@
-.Rproj
+.Rproj.user
 .RData
 .Rhistory
 .httr-oauth
 .DS_Store
 *.html
 *.pdf
-.Rproj.user
