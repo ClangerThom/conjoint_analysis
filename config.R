@@ -1,9 +1,9 @@
 # config.R
 # Configuration file for project paths
 
-if (file.exists("C:/Users/Admin/OneDrive/r/conjoint_analysis")) {
+if (file.exists("C:/Users/Admin/OneDrive/r")) {
   # Computer 1 - adjust this path to match your actual OneDrive location
-  onedrive_base <- "C:/Users/Admin/OneDrive/r/conjoint_analysis"
+  onedrive_base <- "C:/Users/Admin/OneDrive/r"
 } else if (file.exists("D:/OneDrive/Thomas - Personal")) {
   # Computer 2 - adjust this path when you set up your second computer
   onedrive_base <- "D:/OneDrive/Thomas - Personal"
@@ -13,6 +13,6 @@ if (file.exists("C:/Users/Admin/OneDrive/r/conjoint_analysis")) {
 
 
 # Project data paths
-data_path <- file.path(onedrive_base, "r/conjoint_analysis/data/")
-output_plots <- file.path(onedrive_base, "r/conjoint_analysis/plots/")
-output_tables <- file.path(onedrive_base, "r/conjoint_analysis/tables/")
+data_path <- file.path(onedrive_base, "conjoint_analysis/data/")
+output_plots <- file.path(onedrive_base, "conjoint_analysis/plots/")
+output_tables <- file.path(onedrive_base, "conjoint_analysis/tables/")

@@ -1,5 +1,5 @@
 ---
-title: "data_prep"
+title: "analysis"
 format: html
 editor: visual
 ---
@@ -14,6 +14,7 @@ editor: visual
 
 # core functionality
 library(tidyverse)
+library(haven)
 library(janitor)
 
 # modelling and hypothesis testing
@@ -37,6 +38,9 @@ library(extrafont)
 ## Plot theme
 
 ```{r}
+#| output: false
+#| warnings: false
+
 # loading fonts
 loadfonts(device = "win")
 
@@ -100,7 +104,7 @@ variable_lookup <- tribble(
 source("config.R")
 
 # import data
-parents_raw <- read_sav(paste0(data_path, "original_data.sav")) |>
+parents_raw <- read_sav(paste0(data_path, "/original_data.sav")) |>
   as_factor() |> 
   clean_names("snake") # removes all the capitalisation
 ```
@@ -197,3 +201,7 @@ parents_long$vskol_fix <-
 
 parents_long$vskol_fix <- factor(parents_long$vskol_fix)
 ```
+
+# Modelling and hypothesis testing
+
+# Plotting and interpretation
