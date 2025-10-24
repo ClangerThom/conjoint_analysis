@@ -2,7 +2,9 @@
 title: "Normative Prerequisites of Parenthood through the Lens of a Survey Experiment"
 date: 10-24-2025
 description: "A commented guide through analysing a survey experiment"
-format: html
+format: 
+  html:
+    self-contained: true
 editor: visual
 ---
 
