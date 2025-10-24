@@ -6,7 +6,9 @@ editor: visual
 
 # Ideas for Future Analysis
 
--   [ ] Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale
+-   [ ] Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale.
+
+<!-- -->
 
 -   [ ] Make the median income in the vignette the category of comparison.
 
@@ -40,6 +42,9 @@ library(ggforce)
 library(patchwork)
 library(stringr)
 library(extrafont)
+
+# table creation
+library(flextable)
 ```
 
 ## Plot theme
@@ -216,7 +221,8 @@ parents_long <- parents_long |>
     )),
     
     # relevelling the pay of the vignette
-    vplat = factor(vplat, levels=c("58.500 Kč", "39.000 Kč", "19.500 Kč"))
+    vplat = factor(vplat, levels=c("58.500 Kč", "39.000 Kč", "19.500 Kč")),
+    vplat = relevel(vplat, ref = "39.000 Kč")
   )
   
 # Fixing factor levels of nursery availability - they were reversed
@@ -448,32 +454,37 @@ rm(m_q2_mfx_result)
 
 ```{r}
 # the actual plot
-ggplot(
-  m_q1q2_plotting,
-  aes(x = estimate, y = levels, color = model)
-) +
-  geom_vline(xintercept = 0) +
-  geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
-                  position = position_dodge(width = 0.5)) +
-  labs(
-    x = "Average change on an 11 point scale in comparison to\nreference category",
-    y = NULL,
-    title = "AMCEs derived from linear mixed effect model\nwith individual respondent random intercepts",
-    color = "Dependent variable"
+m_q1q2_plotting |> 
+  
+  # this is here just to get the order of the wages correct on the plot
+  mutate(levels = fct_relevel(levels, "19.500 Kč", "39.000 Kč", "58.500 Kč")) |> 
+  
+  # Actual plotting hapenning here
+  ggplot(
+    aes(x = estimate, y = levels, color = model)
   ) +
-  scale_y_discrete(labels = c("nejsou manželé a svatbu v tuto chvíli neplánují" = "nejsou manželé")) +
-  facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
-  plotting_variable_labs +
-  theme(legend.position = "top") +
-  guides(color = guide_legend(
-    title = "Dependent variable",
-    ncol = 1,
-    byrow = TRUE)) +
-  scale_color_manual(
-    values = c("turquoise", "coral"),  # Match your existing colors
-    breaks = c(
-      "How ready are they to have a child?",
-      "How likely are they to have a child in the next 3 years?"))
+    geom_vline(xintercept = 0) +
+    geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
+                    position = position_dodge(width = 0.5)) +
+    labs(
+      x = "Average change on an 11 point scale in comparison to\nreference category",
+      y = NULL,
+      title = "AMCEs derived from linear mixed effect model\nwith individual respondent random intercepts",
+      color = "Dependent variable"
+    ) +
+    scale_y_discrete(labels = c("nejsou manželé a svatbu v tuto chvíli neplánují" = "nejsou manželé")) +
+    facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
+    plotting_variable_labs +
+    theme(legend.position = "top") +
+    guides(color = guide_legend(
+      title = "Dependent variable",
+      ncol = 1,
+      byrow = TRUE)) +
+    scale_color_manual(
+      values = c("turquoise", "coral"),  # Match your existing colors
+      breaks = c(
+        "How ready are they to have a child?",
+        "How likely are they to have a child in the next 3 years?"))
 
 # export
 ggsave("q1_q2_additive_model_plot.png", bg = "white",
@@ -523,6 +534,11 @@ m_means_q1q2 <- add_rows(m_means_q1, m_means_q2, id = "model") |>
 
 ```{r}
 m_means_q1q2 |> 
+  
+  # this is here just to get the order of the wages correct on the plot
+  mutate(levels = fct_relevel(levels, "19.500 Kč", "39.000 Kč", "58.500 Kč")) |> 
+  
+  # Actual plotting hapenning here
   ggplot(
     aes(x = estimate, y = levels, color = model)
   ) +
@@ -559,11 +575,96 @@ ggsave("marginal_means_base.png", bg = "white",
 ## Interaction hypothesis tests table
 
 ```{r}
-
+model_contrasts |> 
+  mutate(
+    model = gsub("m_", "", model),
+    model = gsub("_", " ", model),
+    model = tools::toTitleCase(model),
+    stat = sprintf("%.2f", stat),
+    ndf = as.integer(ndf),
+    ddf = sprintf("%.2f", ddf),
+    p.value = ifelse(p.value < .001, "<.001", sprintf("%.3f", p.value))
+  ) |> 
+  select(Model = model, F = stat, ndf = ndf, ddf = ddf, p = p.value) %>%
+  flextable() |> 
+  set_caption("Model Comparisons") |> 
+  theme_apa() |> 
+  autofit() |> 
+  save_as_docx(path = paste0(output_tables, "/contrasts.docx"))
 ```
 
 ## AMCE plot for Q1 interaction between components and vignette sex
 
-```{r}
+### Data wrangling
 
+```{r}
+#| warnings: false
+
+components <- c("vpar", "vbyt", "vskol_fix", "vzam", "vplat")
+
+sex_mfx <- m_interaction_woman |> 
+  avg_slopes(
+    variables = components,
+    by = "vpoh",
+    re.form = NULL
+  ) |> 
+  separate_wider_delim(
+    contrast,
+    delim = " - ",
+    names = c("variable_level", "reference_level")
+  )
+
+m_interaction_woman_plotting <- model_variable_levels |> 
+  left_join(
+    sex_mfx,
+    by = join_by(variable == term, levels == variable_level)
+  ) |> 
+  # Make these zero
+  mutate(
+    across(
+      c(estimate, conf.low, conf.high),
+      ~ ifelse(is.na(.x), 0, .x)
+    )
+  ) |> 
+  left_join(variable_lookup, by = join_by(variable)) |> 
+  mutate(across(c(levels, variable_nice), ~fct_inorder(.))) |> 
+  filter(variable != "vpoh") |> 
+  mutate(vpoh = case_when(
+    is.na(reference_level) ~ "Muž",
+    .default = vpoh
+  )) |> 
+  mutate(vpoh = case_when(
+    vpoh == "Muž" ~ "Man",
+    vpoh == "Žena" ~ "Woman"
+  ))
+```
+
+### Plotting
+
+```{r}
+m_interaction_woman_plotting |> 
+  
+  # this is here just to get the order of the wages correct on the plot
+  mutate(levels = fct_relevel(levels, "19.500 Kč", "39.000 Kč", "58.500 Kč")) |> 
+  
+  # Actual plotting hapenning here
+  ggplot(
+    aes(x = estimate, y = levels, color = vpoh)
+  ) +
+  geom_vline(xintercept = 0) +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
+                  position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Average change on an 11 point scale in comparison to\nreference category",
+    y = NULL,
+    title = "AMCEs derived from linear mixed effect model\nwith individual respondent random intercepts",
+    color = "Gender of vignette"
+  ) +
+  facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
+  plotting_variable_labs +
+  theme(legend.position = "top")
+
+ggsave("q1_woman_interaction_AMCE.png", bg = "white",
+       width = 15, height = 17.8, units = "cm",
+       path = output_plots)
 ```
