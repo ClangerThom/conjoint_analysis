@@ -238,6 +238,13 @@ rm(parents_raw)
 ## Models for "How ready are \[couple names\] to have children?"
 
 ```{r}
+# just respondent random intercepts (for plotting)
+m_q1 <- lmer(
+  q1rec ~ vpoh + vpar + vbyt + vskol_fix + vzam + vplat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+
 # base model - controlling for respondent level heterogeneity and respondennt characteristics, forms the base of comparisons with models with interactions
 
 m_base_mod <- lmer(
@@ -323,5 +330,14 @@ model_contrasts <-
 ```
 
 ## Models for "How likely are according to you \[couple names\] to become parents in the next 3 years?"
+
+```{r}
+# just a basic one here (for plotting)
+m_q2 <- lmer(
+  q2rec ~ vpoh + vpar + vbyt + vskol_fix + vzam + vplat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+```
 
 # Plotting and interpretation
