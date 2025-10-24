@@ -4,6 +4,10 @@ format: html
 editor: visual
 ---
 
+# Ideas for Future Analysis
+
+-   [ ] Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale
+
 # Setup
 
 ## Libraries
@@ -149,7 +153,7 @@ parents_long <- parents_long |>
   # recodes and relevelling
   mutate(
     # relevelling of response "should or shouldn't become parent"
-    parent = as_factor(case_when(
+    q3rec = as_factor(case_when(
     q3 %in% c("Určitě by se měli stát rodiči", "Spíše by se měli stát rodiči")~ 1,
     q3 %in% c("Určitě by se neměli stát rodiči", "Spíše by se neměli stát rodiči")~ 0,
     .default = NA)
@@ -189,19 +193,135 @@ parents_long <- parents_long |>
     ),
     
     # creating a kids indicator
-    got_kids = as.factor(if_else(s_5 > 0, "Yes", "No"))
+    parent = as.factor(if_else(s_5 > 0, "Yes", "No")),
+    
+    # recoding to english
+    economic_activity = factor(case_when(
+    s_8 == "Student/učeň" ~ "Economically inactive",
+    s_8 == "Zaměstnanec" ~ "Economically active",
+    s_8 == "Osoba samostatně výdělečně činná/podnikatel" ~ "Economically active",
+    s_8 == "Nezaměstnaný" ~ "Unemployed",
+    s_8 == "Starobní/invalidní důchodce" ~ "Economically inactive",
+    s_8 == "Na rodičovské, mateřské nebo otcovské dovolené" ~ "Economically inactive",
+    s_8 == "Jiná" ~ "Other"
+    )),
+    
+    # recoding education (low - medium - high)
+    edu_rec = factor(case_when(
+    edu == "ZŠ" ~ "Bez maturity",
+    .default = edu
+    )),
+    
+    # relevelling the pay of the vignette
+    vplat = factor(vplat, levels=c("58.500 Kč", "39.000 Kč", "19.500 Kč"))
   )
   
 # Fixing factor levels of nursery availability - they were reversed
 
 parents_long$vskol_fix <- 
   ifelse(parents_long$vskol == levels(parents_long$vskol)[1], 
-                               levels(parents_long_proper$vskol)[2], 
-                               levels(parents_long_proper$vskol)[1])
+                               levels(parents_long$vskol)[2], 
+                               levels(parents_long$vskol)[1])
 
 parents_long$vskol_fix <- factor(parents_long$vskol_fix)
+
+# relocating some vars
+parents_long <- parents_long |> 
+  relocate(vskol_fix, .after = vskol)
+
+# removing the raw file from the environment
+rm(parents_raw)
 ```
 
 # Modelling and hypothesis testing
+
+## Models for "How ready are \[couple names\] to have children?"
+
+```{r}
+# base model - controlling for respondent level heterogeneity and respondennt characteristics, forms the base of comparisons with models with interactions
+
+m_base_mod <- lmer(
+  q1rec ~ vpoh + vpar + vbyt + vskol_fix + vzam + vplat
+  + parent + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+
+# modelling the order effect
+
+m_base_mod_order <- lmer(
+  q1rec ~ vpoh + vpar + vbyt + vskol_fix + vzam + vplat
+  + factor(vignette)
+  + parent + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+
+# interaction between gender of vignette and other components
+
+m_interaction_woman <- lmer(
+  q1rec ~ (vpar + vbyt + vskol_fix + vzam + vplat) * vpoh
+  + parent + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+
+# interaction between respondent sex and vignette components
+
+m_interaction_r_sex <- lmer(
+  q1rec ~ (vpar + vbyt + vskol_fix + vzam + vplat + vpoh) * sex
+  + reg + economic_activity + edu_rec + s_4 + s_7 + size + parent + age_kat
+  + (1 | id),
+  data = parents_long
+)
+
+# interaction between respondent housing tenure and rating of vignette housing
+
+m_interaction_r_housing <- lmer(
+  q1rec ~ vpoh + vpar + vskol_fix + vzam + vplat
+  + vbyt * s_7
+  + factor(vignette)
+  + parent + economic_activity + sex + edu_rec + s_4 + size + reg + age_kat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+
+# by parenthood
+
+m_interaction_r_parent <- lmer(
+  q1rec ~ (vpoh + vpar + vbyt + vskol_fix + vzam + vplat) * parent
+  + factor(vignette)
+  + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+
+# by level of income in vignette
+m_interaction_income <- lmer(
+  q1rec ~ (vpoh + vpar + vbyt + vskol_fix + vzam) * vplat
+  + factor(vignette)
+  + parent + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
+  + (1 | id), # respondent random intercepts
+  data = parents_long
+)
+```
+
+## Hypothesis tests for interactions
+
+Since these are all random effects models, I need to use a Kenward-Rogers approximation of degrees of freedom to be able to evaluate the F-test.
+
+```{r}
+# insert models to be compared to the base
+models <- c("m_base_mod_order", "m_interaction_woman", "m_interaction_income", "m_interaction_r_sex", "m_interaction_r_housing", "m_interaction_r_parent")
+
+# loops through comparisons and assembles a table
+model_contrasts <- 
+  map(models, ~ tidy(KRmodcomp(get(.x), m_base_mod)) |> 
+  mutate(model = .x)) |> 
+  bind_rows() |> 
+  mutate(across(where(is.numeric), ~ pmax(round(.x, 3), 0.001)))
+```
+
+## Models for "How likely are according to you \[couple names\] to become parents in the next 3 years?"
 
 # Plotting and interpretation
