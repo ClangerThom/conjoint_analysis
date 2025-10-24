@@ -9,13 +9,15 @@ editor: visual
 ## Libraries
 
 ```{r}
+#| output: false
+#| warnings: false
+
 # core functionality
 library(tidyverse)
 library(janitor)
 
 # modelling and hypothesis testing
 library(lme4)
-library(lmertest)
 library(pbkrtest)
 
 # tidy model outputs and marginal effects
@@ -75,10 +77,123 @@ plotting_variable_labs <- scale_y_discrete(
              "19.500 Kč" = "19.500 czk"))
 ```
 
-## Loading in data
+## Lookup table with tidy variable and value names
+
+```{r}
+# Make a little lookup table for nicer feature labels
+variable_lookup <- tribble(
+  ~variable,    ~variable_nice,
+  "vbyt",  "Housing",
+  "vpar",  "Partnership status",
+  "vskol_fix", "Availability of public daycare",
+  "vpoh",  "Gender of vignette",
+  "vzam",  "Employment stability",
+  "vplat", "Income"
+) |>  
+  mutate(variable_nice = fct_inorder(variable_nice))
+```
+
+## Loading in raw data
 
 ```{r}
 # data and output file paths to my onedrive - change as needed
 source("config.R")
 
+# import data
+parents_raw <- read_sav(paste0(data_path, "original_data.sav")) |>
+  as_factor() |> 
+  clean_names("snake") # removes all the capitalisation
+```
+
+# Data cleaning
+
+## Expanding to long format
+
+```{r}
+# Adding vignette number indicator at the end of response vars
+# instead of it being at the beginning
+parents_long <- parents_raw |> 
+  rename_with(~ case_when(
+    startsWith(.x, "r1") ~ paste0(sub("^r1", "", .x), "1"),
+    startsWith(.x, "r2") ~ paste0(sub("^r2", "", .x), "2"),
+    startsWith(.x, "r3") ~ paste0(sub("^r3", "", .x), "3"),
+    startsWith(.x, "r4") ~ paste0(sub("^r4", "", .x), "4"),
+    startsWith(.x, "r5") ~ paste0(sub("^r5", "", .x), "5"),
+    startsWith(.x, "r6") ~ paste0(sub("^r6", "", .x), "6"),
+    TRUE ~ .x
+  ))
+
+# adding an underscore before the vignette number indicator for simpler pivoting
+colnames(parents_long) <- gsub("(\\d)$", "_\\1", colnames(parents_long))
+
+# removing all underscores except the final one
+colnames(parents_long) <- ifelse(
+  grepl("_", colnames(parents_long)) & str_count(colnames(parents_long), "_") > 1,
+  sub("_", "", colnames(parents_long)), colnames(parents_long))
+
+# actual pivot into long format
+parents_long <- parents_long |> 
+  pivot_longer(
+    cols = !c("id", "status", "s_4", "s_5", "s_6", "s_7", "s_8", "sex", "age",
+              "age_kat", "reg", "size", "edu", "ms",
+              "pinc", "hinc", "xx_1", "xx_2", "xx_3", "xx_4", "xx_5", "stej"),
+    names_to = c(".value", "vignette"),
+    names_sep = "_",
+    values_drop_na = TRUE
+  ) |> 
+  
+  # recodes and relevelling
+  mutate(
+    # relevelling of response "should or shouldn't become parent"
+    parent = as_factor(case_when(
+    q3 %in% c("Určitě by se měli stát rodiči", "Spíše by se měli stát rodiči")~ 1,
+    q3 %in% c("Určitě by se neměli stát rodiči", "Spíše by se neměli stát rodiči")~ 0,
+    .default = NA)
+    ),
+    # changing reference category
+    vplat = relevel(vplat, 2),
+    
+    # making the continuous response var continuous
+    q1rec = case_when(
+    q1 == "Zcela nepřipraven" ~ 0,
+    q1 == "1" ~ 1,
+    q1 == "2" ~ 2,
+    q1 == "3" ~ 3,
+    q1 == "4" ~ 4,
+    q1 == "5" ~ 5,
+    q1 == "6" ~ 6,
+    q1 == "7" ~ 7,
+    q1 == "8" ~ 8,
+    q1 == "9" ~ 9,
+    q1 == "Zcela připraven" ~ 10,
+    TRUE ~ NA
+    ),
+    
+    q2rec = case_when(
+    q2 == "Velmi nepravděpodobné" ~ 0,
+    q2 == "1" ~ 1,
+    q2 == "2" ~ 2,
+    q2 == "3" ~ 3,
+    q2 == "4" ~ 4,
+    q2 == "5" ~ 5,
+    q2 == "6" ~ 6,
+    q2 == "7" ~ 7,
+    q2 == "8" ~ 8,
+    q2 == "9" ~ 9,
+    q2 == "Velmi pravděpodobné" ~ 10,
+    TRUE ~ NA
+    ),
+    
+    # creating a kids indicator
+    got_kids = as.factor(if_else(s_5 > 0, "Yes", "No"))
+  )
+  
+# Fixing factor levels of nursery availability - they were reversed
+
+parents_long$vskol_fix <- 
+  ifelse(parents_long$vskol == levels(parents_long$vskol)[1], 
+                               levels(parents_long_proper$vskol)[2], 
+                               levels(parents_long_proper$vskol)[1])
+
+parents_long$vskol_fix <- factor(parents_long$vskol_fix)
 ```
