@@ -1,8 +1,28 @@
 ---
-title: "analysis"
+title: "Normative Prerequisites of Parenthood through the Lens of a Survey Experiment"
+date: 10-24-2025
+description: "A commented guide through analysing a survey experiment"
 format: html
 editor: visual
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.height = 6*1.1,
+  fig.retina = 3,
+  dev = "ragg_png",
+  fig.align = "center",
+  out.width = "90%",
+  collapse = TRUE
+)
+
+options(
+  digits = 4,
+  width = 300,
+  dplyr.summarise.inform = FALSE
+)
+```
 
 # Introduction
 
@@ -12,18 +32,15 @@ Further documentation, the data itself and any outputs of this script such as ta
 
 ## Ideas for future analyses
 
--   [ ] Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale.
-
-<!-- -->
-
--   [ ] Make the median income in the vignette the category of comparison.
+-   Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale.
+-   Investigate the robustness of including respondents with repeated vignettes. Check whether they are the same respondents who then rated more vignettes or new ones.
 
 # Setup
 
-## Libraries
+Loading necessary packages for analysis. Mainly tidyverse for overall functionality, haven for importing .SAV data, and lme4 with marginaleffects and broom to obtain interpretable model outputs.
 
-```{r}
-#| output: false
+```{r libraries}
+#| message: false
 #| warnings: false
 
 # core functionality
@@ -51,13 +68,15 @@ library(extrafont)
 
 # table creation
 library(flextable)
+library(kableExtra)
 ```
 
-## Plot theme
+Next I set up the plot theme and the recoding scheme to transform Czech value labels to English ones. I am also using a non-native font called Jost, so be sure to download it from Google fonts if you are replicating this at home. The download link is inside the codeblock.
 
-```{r}
-#| output: false
+```{r plot-theme}
+#| message: false
 #| warnings: false
+#| code-fold: true
 
 # loading fonts
 loadfonts(device = "win")
@@ -97,11 +116,7 @@ plotting_variable_labs <- scale_y_discrete(
              "58.500 Kč" = "58.500 czk",
              "39.000 Kč" = "39.000 czk",
              "19.500 Kč" = "19.500 czk"))
-```
 
-## Lookup table with tidy variable and value names
-
-```{r}
 # Make a little lookup table for nicer feature labels
 variable_lookup <- tribble(
   ~variable,    ~variable_nice,
@@ -115,9 +130,13 @@ variable_lookup <- tribble(
   mutate(variable_nice = fct_inorder(variable_nice))
 ```
 
-## Loading in raw data
+Finally, I load in raw data from my Onedrive. The file path is managed by the config, add yours in that file.
 
-```{r}
+```{r data}
+#| message: false
+#| warnings: false
+#| code-fold: true
+
 # data and output file paths to my onedrive - change as needed
 source("config.R")
 
@@ -129,9 +148,15 @@ parents_raw <- read_sav(paste0(data_path, "/original_data.sav")) |>
 
 # Data cleaning
 
-## Expanding to long format
+Raw data is in a wide format - one respondent and their 6 vignette ratings per row. The analysis requires data in a long format - one vignette rating per row.
 
-```{r}
+A sizable chunk of respondents rated vignettes due to a fault in the randomisation procedure. Nevertheless, I decided to keep them since randomisation with replacement shouldn't violate any of the assumptions behind this analysis, hence they bolster the overall sample size. Technically they rated "new vignettes" that differed in assigned names, but all the substantive component levels remained the same. It It is possible to filter them out by simply adding "filter(stejne == 0)" to the pipe.
+
+```{r data-cleaning}
+#| message: false
+#| warning: false
+#| code-fold: true
+
 # Adding vignette number indicator at the end of response vars
 # instead of it being at the beginning
 parents_long <- parents_raw |> 
@@ -252,23 +277,87 @@ rm(parents_raw)
 
 ## Table of descriptive statistics
 
-## Closer look at the two 11-point rating scales
+```{r descriptive-stats}
+#| warning: false
+#| message: false
+#| code-fold: true
+
+# table for response variables
+parents_long |>
+  summarise(
+    Mean = sprintf("%.2f", mean(q1rec, na.rm = TRUE)),
+    SD = sprintf("%.2f", sd(q1rec, na.rm = TRUE)),
+    Min = min(q1rec, na.rm = TRUE),
+    Max = max(q1rec, na.rm = TRUE),
+    Missing = sum(is.na(q1rec))/sum(!is.na(q1rec))
+  ) |>
+  mutate(Measure = "Question 1", .before = 1) |>
+  bind_rows(
+    parents_long |>
+      summarise(
+        Measure = "Question 2",
+        Mean = sprintf("%.2f", mean(q2rec, na.rm = TRUE)),
+        SD = sprintf("%.2f", sd(q2rec, na.rm = TRUE)),
+        Min = min(q2rec, na.rm = TRUE),
+        Max = max(q2rec, na.rm = TRUE),
+        Missing = sum(is.na(q2rec))/sum(!is.na(q2rec))
+      )
+  ) |>
+  kbl(format = "html", escape = FALSE, 
+      caption = "Descriptive Statistics for Response Variables") |>
+  kable_classic(full_width = FALSE, html_font = "Times New Roman") |>
+  row_spec(0, bold = TRUE)
+```
+
+## Bar charts of counts of the answers to the response variables
+
+Practically the same, ratings below 5 were rarely ever given. The only notable difference is that respondents never said that the couple was completely unprepared to have a child (never gave a rating of 0 to q1).
+
+```{r kernel-density-plots}
+#| fig-height: 4
+#| fig-width: 6
+#| message: false
+#| warning: false
+#| code-fold: true
+
+ggplot(parents_long, aes(x = q1rec)) +
+  geom_bar(fill = "gray80", color = "black") +
+  scale_x_continuous(breaks = seq(0, 10, by = 1)) +
+  coord_cartesian(xlim = c(0, 10)) +
+  labs(x = "Q1 Response", y = "Counts", title = "Counts of responses to question 1") +
+  theme_nice()
+
+ggplot(parents_long, aes(x = q2rec)) +
+  geom_bar(fill = "gray80", color = "black") +
+  scale_x_continuous(breaks = seq(0, 10, by = 1)) +
+  coord_cartesian(xlim = c(0, 10)) +
+  labs(x = "Q2 Response", y = "Counts", title = "Counts of responses to question 2") +
+  theme_nice()
+```
+
+## The 11 point scales
 
 #### Questions:
 
 1\. Do jaké míry jsou \[jméno muže/ženy\] a \[jméno ženy/muže\] připraveni stát se rodiči?
 
-0-     Zcela nepřipraveni,… 10 - Zcela připraveni, Nevím
+0 - Zcela nepřipraveni, …, 10 - Zcela připraveni, Nevím
 
 2\. Jak pravděpodobné podle Vás je, že se \[jméno muže/ženy\] a \[jméno ženy/muže\] stanou v příštích 3 letech rodiči?
 
-0-     Velmi nepravděpodobné, … 10 – Velmi pravděpodobné, Nevím
+0 - Velmi nepravděpodobné, …, 10 – Velmi pravděpodobné, Nevím
 
 # Modelling and hypothesis testing
 
 ## Models for "How ready are \[couple names\] to have children?"
 
-```{r}
+All these models are mixed effects models with respondent level random intercepts. The dependent variable is the question above, rated on an 11 point scale. All the hypotheses about interactions were tested on this dependent variable.
+
+```{r modelling-q1}
+#| warning: false
+#| message: false
+#| code-fold: true
+
 # just respondent random intercepts (for plotting)
 m_q1 <- lmer(
   q1rec ~ vpoh + vpar + vbyt + vskol_fix + vzam + vplat
@@ -348,7 +437,11 @@ m_interaction_income <- lmer(
 
 Since these are all random effects models, I need to use a Kenward-Rogers approximation of degrees of freedom to be able to evaluate the F-test.
 
-```{r}
+```{r hypothesis-tests}
+#| warning: false
+#| message: false
+#| code-fold: true
+
 # insert models to be compared to the base
 models <- c("m_base_mod_order", "m_interaction_woman", "m_interaction_income", "m_interaction_r_sex", "m_interaction_r_housing", "m_interaction_r_parent")
 
@@ -362,7 +455,13 @@ model_contrasts <-
 
 ## Models for "How likely are according to you \[couple names\] to become parents in the next 3 years?"
 
-```{r}
+Just a simple additive mixed effects model with the second 11-point question. Used to construct the first plot.
+
+```{r modelling-q2}
+#| warning: false
+#| message: false
+#| code-fold: true
+
 # just a basic one here (for plotting)
 m_q2 <- lmer(
   q2rec ~ vpoh + vpar + vbyt + vskol_fix + vzam + vplat
@@ -373,14 +472,18 @@ m_q2 <- lmer(
 
 # Plotting and interpretation
 
+First I estimate AMCEs (causal estimand) of the additive models with all the components. Then I look at the marginal means of different vignette features (average response to vignettes that included that feature). In the second step I perform nested model comparisons using an F-test to test the statistical significance of various interactions. Finally I provide various plots for the model with interactions between vignette gender and other vignette features.
+
 ## AMCE plot for Q1 and Q2 from basic mixed effect model
 
 ### Data wrangling for the plot itself
 
-Pulling out the AMCEs from the models including a rather annoying procedure to add a row for the baseline category set to 0 for the coefficient plots. Applying nicer variable and value labels from the lookup table.
+I pull out the AMCEs from the models with the marginaleffects package. The code below includes a rather annoying procedure to add reference category row set to 0 for the coefficient plots. I also apply nicer variable and value labels from the lookup table.
 
-```{r}
-#| warnings: false
+```{r AMCE-plot-data-cleaning}
+#| warning: false
+#| message: false
+#| code-fold: true
 
 # Get population level predictions
 m_q1_mfx <- avg_slopes(
@@ -474,7 +577,13 @@ rm(m_q2_mfx_result)
 
 ### Plotting
 
-```{r}
+The plot below shows the coefficients of the 2 additive base models analysing the 11-point response scales.
+
+```{r AMCE-plot}
+#| warning: false
+#| message: false
+#| code-fold: true
+
 # the actual plot
 m_q1q2_plotting |> 
   
@@ -507,6 +616,14 @@ m_q1q2_plotting |>
       breaks = c(
         "How ready are they to have a child?",
         "How likely are they to have a child in the next 3 years?"))
+```
+
+Finally I export the created plot to my Onedrive.
+
+```{r plot-export-additive}
+#| warnings: false
+#| message: false
+#| code-fold: true
 
 # export
 ggsave("q1_q2_additive_model_plot.png", bg = "white",
@@ -518,8 +635,10 @@ ggsave("q1_q2_additive_model_plot.png", bg = "white",
 
 ### Data wrangling
 
-```{r}
+```{r MM-plot-data-cleaning}
 #| warnings: false
+#| message: false
+#| code-fold: true
 
 components <- c("vpoh", "vpar", "vbyt", "vskol_fix", "vzam", "vplat")
 
@@ -554,7 +673,11 @@ m_means_q1q2 <- add_rows(m_means_q1, m_means_q2, id = "model") |>
 
 ### Plotting
 
-```{r}
+```{r MM-plot}
+#| warning: false
+#| message: false
+#| code-fold: true
+
 m_means_q1q2 |> 
   
   # this is here just to get the order of the wages correct on the plot
@@ -587,8 +710,16 @@ m_means_q1q2 |>
       breaks = c(
         "How ready are they to have a child?",
         "How likely are they to have a child in the next 3 years?"))
+```
 
-# exporting
+And finally again exporting the output to my Onedrive.
+
+```{r plot-export-mm}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
+# export
 ggsave("marginal_means_base.png", bg = "white",
        width = 15, height = 17.8, units = "cm",
        path = output_plots)
@@ -596,7 +727,13 @@ ggsave("marginal_means_base.png", bg = "white",
 
 ## Interaction hypothesis tests table
 
-```{r}
+This code chunk should output an html table that will show you the results of the hypothesis tests
+
+```{r html-table}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
 model_contrasts |> 
   mutate(
     model = gsub("m_", "", model),
@@ -607,7 +744,30 @@ model_contrasts |>
     ddf = sprintf("%.2f", ddf),
     p.value = ifelse(p.value < .001, "<.001", sprintf("%.3f", p.value))
   ) |> 
-  select(Model = model, F = stat, ndf = ndf, ddf = ddf, p = p.value) %>%
+  select(Model = model, F = stat, ndf = ndf, ddf = ddf, p = p.value) |>
+  kbl(format = "html", escape = FALSE, caption = "Model Comparisons") |> 
+  kable_classic(full_width = FALSE, html_font = "Times New Roman")  |> 
+  row_spec(0, bold = TRUE)
+```
+
+The code chunk below creates a standard APA table as a word document exported to my Onedrive.
+
+```{r table-interaction-tests-export-to-word}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
+model_contrasts |> 
+  mutate(
+    model = gsub("m_", "", model),
+    model = gsub("_", " ", model),
+    model = tools::toTitleCase(model),
+    stat = sprintf("%.2f", stat),
+    ndf = as.integer(ndf),
+    ddf = sprintf("%.2f", ddf),
+    p.value = ifelse(p.value < .001, "<.001", sprintf("%.3f", p.value))
+  ) |> 
+  select(Model = model, F = stat, ndf = ndf, ddf = ddf, p = p.value) |>
   flextable() |> 
   set_caption("Model Comparisons") |> 
   theme_apa() |> 
@@ -619,8 +779,10 @@ model_contrasts |>
 
 ### Data wrangling
 
-```{r}
+```{r data-wrangling-interaction-plot}
 #| warnings: false
+#| message: false
+#| code-fold: true
 
 components <- c("vpar", "vbyt", "vskol_fix", "vzam", "vplat")
 
@@ -663,7 +825,11 @@ m_interaction_woman_plotting <- model_variable_levels |>
 
 ### Plotting
 
-```{r}
+```{r plot-interaction}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
 m_interaction_woman_plotting |> 
   
   # this is here just to get the order of the wages correct on the plot
@@ -685,6 +851,14 @@ m_interaction_woman_plotting |>
   facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
   plotting_variable_labs +
   theme(legend.position = "top")
+```
+
+In this block I export the result to my Onedrive.
+
+```{r export-interaction-plot}
+#| warnings: false
+#| message: false
+#| code-fold: true
 
 ggsave("q1_woman_interaction_AMCE.png", bg = "white",
        width = 15, height = 17.8, units = "cm",
