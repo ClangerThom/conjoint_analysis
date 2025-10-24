@@ -9,12 +9,76 @@ editor: visual
 ## Libraries
 
 ```{r}
+# core functionality
 library(tidyverse)
+library(janitor)
+
+# modelling and hypothesis testing
+library(lme4)
+library(lmertest)
+library(pbkrtest)
+
+# tidy model outputs and marginal effects
+library(broom)
+library(broom.mixed)
+library(broom.helpers)
+library(marginaleffects)
+
+# plotting
+library(scales)
+library(ggforce)
+library(patchwork)
+library(stringr)
+library(extrafont)
+```
+
+## Plot theme
+
+```{r}
+# loading fonts
+loadfonts(device = "win")
+
+# custom ggplot theme
+# get font at https://fonts.google.com/specimen/Jost
+theme_nice <- function() {
+  theme_minimal(base_family = "Jost") +
+    theme(panel.grid.minor = element_blank(),
+          plot.title = element_text(family = "Jost", face = "bold"),
+          axis.title = element_text(family = "Jost Medium"),
+          axis.title.x = element_text(hjust = 0),
+          axis.title.y = element_text(hjust = 1),
+          strip.text = element_text(family = "Jost", face = "bold",
+                                    size = rel(0.75), hjust = 0),
+          strip.background = element_rect(fill = "grey90", color = NA))
+}
+
+# Set default theme and font stuff
+theme_set(theme_nice())
+update_geom_defaults("text", list(family = "Jost", fontface = "plain"))
+update_geom_defaults("label", list(family = "Jost", fontface = "plain"))
+
+#Function for relabeling all the variable levels to english
+plotting_variable_labs <- scale_y_discrete(
+  labels = c("nejsou manželé a svatbu v tuto chvíli neplánují" = "aren't married",
+             "Žena" = "woman",
+             "Muž" = "man",
+             "jsou manželé" = "are married",
+             "mají v pronájmu" = "rent a flat",
+             "pořídili si na hypotéku" = "mortgage of flat",
+             "zdědili po babičce" = "inherited a flat",
+             "nebyla dostupná školka" = "unavailable daycare",
+             "byla dostupná školka" = "available daycare",
+             "ještě na jeden rok" = "fixed term contract\nfor 1 more year",
+             "smlouvu na dobu neurčitou" = "permanent contract",
+             "58.500 Kč" = "58.500 czk",
+             "39.000 Kč" = "39.000 czk",
+             "19.500 Kč" = "19.500 czk"))
 ```
 
 ## Loading in data
 
 ```{r}
+# data and output file paths to my onedrive - change as needed
 source("config.R")
 
 ```
