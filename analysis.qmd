@@ -8,6 +8,8 @@ editor: visual
 
 -   [ ] Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale
 
+-   [ ] Make the median income in the vignette the category of comparison.
+
 # Setup
 
 ## Libraries
@@ -20,6 +22,7 @@ editor: visual
 library(tidyverse)
 library(haven)
 library(janitor)
+library(sjmisc)
 
 # modelling and hypothesis testing
 library(lme4)
@@ -341,3 +344,148 @@ m_q2 <- lmer(
 ```
 
 # Plotting and interpretation
+
+## AMCE plot for Q1 and Q2 from basic mixed effect model
+
+### Data wrangling for the plot itself
+
+Pulling out the AMCEs from the models including a rather annoying procedure to add a row for the baseline category set to 0 for the coefficient plots. Applying nicer variable and value labels from the lookup table.
+
+```{r}
+#| warnings: false
+
+# Get population level predictions
+m_q1_mfx <- avg_slopes(
+  m_q1,
+  re.form = NULL # this option integrates info from offsets into predictions
+)
+m_q2_mfx <- avg_slopes(
+  m_q2,
+  re.form = NULL
+)
+
+# Extract all the right-hand side variables
+rhs_vars <- all.vars(stats::update(lme4::nobars(formula(m_q1)), 0 ~ .))
+
+# Make a data frame of all the levels of all the non-numeric things
+model_variable_levels <- tibble(
+  variable = rhs_vars
+) |> 
+  mutate(levels = map(variable, ~{
+    x <- parents_long[[.x]]
+    if (is.numeric(x)) {
+      ""
+    } else if (is.factor(x)) {
+      levels(x)
+    } else {
+      sort(unique(x))
+    }
+  })) |> 
+  unnest(levels) |> 
+  mutate(term = paste0(variable,levels))
+
+m_q1_mfx_result <- m_q1_mfx |> 
+  separate_wider_delim(
+    contrast,
+    delim = " - ",
+    names = c("variable_level", "reference_level")
+  )
+
+m_q2_mfx_result <- m_q2_mfx |> 
+  separate_wider_delim(
+    contrast,
+    delim = " - ",
+    names = c("variable_level", "reference_level")
+  )
+
+m_q1_plotting <- model_variable_levels |> 
+  left_join(
+    m_q1_mfx_result,
+    by = join_by(variable == term, levels == variable_level)
+  ) |> 
+  # make these zero
+  mutate(
+    across(
+      c(estimate, conf.low, conf.high),
+      ~ ifelse(is.na(.x), 0, .x)
+    )
+  ) |> 
+  left_join(variable_lookup, by = join_by(variable)) |> 
+  mutate(across(c(levels, variable_nice), ~fct_inorder(.)))
+
+m_q2_plotting <- model_variable_levels |> 
+  left_join(
+    m_q2_mfx_result,
+    by = join_by(variable == term, levels == variable_level)
+  ) |> 
+  # make these zero
+  mutate(
+    across(
+      c(estimate, conf.low, conf.high),
+      ~ ifelse(is.na(.x), 0, .x)
+    )
+  ) |> 
+  left_join(variable_lookup, by = join_by(variable)) |> 
+  mutate(across(c(levels, variable_nice), ~fct_inorder(.)))
+
+m_q1q2_plotting <- add_rows(m_q1_plotting, m_q2_plotting, id = "model") |> 
+  mutate(model = as.factor(case_when(
+    model == 1 ~ "How ready are they to have a child?",
+    model == 2 ~ "How likely are they to have a child in the next 3 years?"
+  )))
+```
+
+### The plot itself
+
+```{r}
+# the actual plot
+ggplot(
+  m_q1q2_plotting,
+  aes(x = estimate, y = levels, color = model)
+) +
+  geom_vline(xintercept = 0) +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
+                  position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Average change on an 11 point scale in comparison to\nreference category",
+    y = NULL,
+    title = "AMCEs derived from linear mixed effect model\nwith individual respondent random intercepts",
+    color = "Dependent variable"
+  ) +
+  scale_y_discrete(labels = c("nejsou manželé a svatbu v tuto chvíli neplánují" = "nejsou manželé")) +
+  facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
+  plotting_variable_labs +
+  theme(legend.position = "top") +
+  guides(color = guide_legend(
+    title = "Dependent variable",
+    ncol = 1,
+    byrow = TRUE)) +
+  scale_color_manual(
+    values = c("turquoise", "coral"),  # Match your existing colors
+    breaks = c(
+      "How ready are they to have a child?",
+      "How likely are they to have a child in the next 3 years?"))
+
+# exporting it
+ggsave("q1_q2_additive_model_plot.png", bg = "white",
+       width = 15, height = 17.8, units = "cm",
+       path = output_plots)
+```
+
+## Marginal means plot for Q1 and Q2
+
+```{r}
+
+```
+
+## Interaction hypothesis tests table
+
+```{r}
+
+```
+
+## AMCE plot for Q1 interaction between components and vignette sex
+
+```{r}
+
+```
