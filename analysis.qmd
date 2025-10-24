@@ -433,9 +433,18 @@ m_q1q2_plotting <- add_rows(m_q1_plotting, m_q2_plotting, id = "model") |>
     model == 1 ~ "How ready are they to have a child?",
     model == 2 ~ "How likely are they to have a child in the next 3 years?"
   )))
+
+# unload the intermediate things from the environment
+rm(m_q1_plotting)
+rm(m_q1_mfx)
+rm(m_q1_mfx_result)
+
+rm(m_q2_plotting)
+rm(m_q2_mfx)
+rm(m_q2_mfx_result)
 ```
 
-### The plot itself
+### Plotting
 
 ```{r}
 # the actual plot
@@ -466,7 +475,7 @@ ggplot(
       "How ready are they to have a child?",
       "How likely are they to have a child in the next 3 years?"))
 
-# exporting it
+# export
 ggsave("q1_q2_additive_model_plot.png", bg = "white",
        width = 15, height = 17.8, units = "cm",
        path = output_plots)
@@ -474,8 +483,77 @@ ggsave("q1_q2_additive_model_plot.png", bg = "white",
 
 ## Marginal means plot for Q1 and Q2
 
-```{r}
+### Data wrangling
 
+```{r}
+#| warnings: false
+
+components <- c("vpoh", "vpar", "vbyt", "vskol_fix", "vzam", "vplat")
+
+m_means_q1 <- map(components, ~ predictions(
+  model = m_q1,
+  by = c(.x),
+  re.form = NULL
+) |> 
+  rename(levels = .x) |> 
+  mutate(variable = .x)
+) |> 
+  bind_rows() |> 
+  left_join(variable_lookup, by = join_by(variable))
+
+m_means_q2 <- map(components, ~ predictions(
+  model = m_q2,
+  by = c(.x),
+  re.form = NULL
+) |> 
+  rename(levels = .x) |> 
+  mutate(variable = .x)
+) |> 
+  bind_rows() |> 
+  left_join(variable_lookup, by = join_by(variable))
+
+m_means_q1q2 <- add_rows(m_means_q1, m_means_q2, id = "model") |> 
+  mutate(model = as.factor(case_when(
+    model == 1 ~ "How ready are they to have a child?",
+    model == 2 ~ "How likely are they to have a child in the next 3 years?"
+  )))
+```
+
+### Plotting
+
+```{r}
+m_means_q1q2 |> 
+  ggplot(
+    aes(x = estimate, y = levels, color = model)
+  ) +
+    geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
+                    position = position_dodge(width = 0.5)) +
+    plotting_variable_labs +
+    scale_color_discrete(labels = c("Muž" = "Man", "Žena" = "Woman")) +
+    labs(
+      x = "Marginal mean",
+      y = NULL,
+      title = "Marginal means",
+      subtitle = "(score ranging from 0 to 10)",
+      color = "Is the respondent a parent?"
+    ) +
+    facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
+    plotting_variable_labs +
+    theme(legend.position = "top") +
+    guides(color = guide_legend(
+      title = "Dependent variable",
+      ncol = 1,
+      byrow = TRUE)) +
+    scale_color_manual(
+      values = c("turquoise", "coral"),  # Match your existing colors
+      breaks = c(
+        "How ready are they to have a child?",
+        "How likely are they to have a child in the next 3 years?"))
+
+# exporting
+ggsave("marginal_means_base.png", bg = "white",
+       width = 15, height = 17.8, units = "cm",
+       path = output_plots)
 ```
 
 ## Interaction hypothesis tests table
