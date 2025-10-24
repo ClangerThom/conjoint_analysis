@@ -4,7 +4,13 @@ format: html
 editor: visual
 ---
 
-# Ideas for Future Analysis
+# Introduction
+
+This document provides the complete script for the analysis of data collected in the Czech Republic in Autumn last year. It was a survey experiment attempting to measure the normative prerequisites of parenthood in the Czech Republic using a survey experiment. Respondents from an online panel convenience cycle were asked to rate parental readiness of couples whose traits we varied randomly. This analysis identifies the AMCEs (causal effects of varying the vignette characteristics) and aims to test various hypotheses about interactions between respondent characteristics and vignette components.
+
+Further documentation, the data itself and any outputs of this script such as tables and plots can be found in an accompanying Onedrive.
+
+## Ideas for future analyses
 
 -   [ ] Instead of making models for each response variable separately, join them all up into 1 index? The answers are highly correlated anyway, particularly q1 and q2, which use the same scale.
 
@@ -241,6 +247,22 @@ parents_long <- parents_long |>
 # removing the raw file from the environment
 rm(parents_raw)
 ```
+
+# Descriptive analysis
+
+## Table of descriptive statistics
+
+## Closer look at the two 11-point rating scales
+
+#### Questions:
+
+1\. Do jaké míry jsou \[jméno muže/ženy\] a \[jméno ženy/muže\] připraveni stát se rodiči?
+
+0-     Zcela nepřipraveni,… 10 - Zcela připraveni, Nevím
+
+2\. Jak pravděpodobné podle Vás je, že se \[jméno muže/ženy\] a \[jméno ženy/muže\] stanou v příštích 3 letech rodiči?
+
+0-     Velmi nepravděpodobné, … 10 – Velmi pravděpodobné, Nevím
 
 # Modelling and hypothesis testing
 
