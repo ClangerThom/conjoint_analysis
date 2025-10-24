@@ -28,9 +28,9 @@ options(
 
 # Introduction
 
-This document provides the complete script for the analysis of data collected in the Czech Republic in Autumn last year. It was a survey experiment attempting to measure the normative prerequisites of parenthood in the Czech Republic using a survey experiment. Respondents from an online panel convenience cycle were asked to rate parental readiness of couples whose traits we varied randomly. This analysis identifies the AMCEs (causal effects of varying the vignette characteristics) and aims to test various hypotheses about interactions between respondent characteristics and vignette components.
+This document provides the complete script for the analysis of data collected in the Czech Republic in Autumn last year. It was a survey experiment attempting to measure the normative prerequisites of parenthood in the Czech Republic using a survey experiment. Respondents from an online panel convenience sample were asked to rate parental readiness of couples whose traits we varied randomly. This analysis identifies AMCEs (causal effects of varying the vignette characteristics) and aims to test various hypotheses about interactions between respondent characteristics and vignette components.
 
-Further documentation, the data itself and any outputs of this script such as tables and plots can be found in an accompanying Onedrive.
+Further documentation, the data itself and any outputs of this script such as tables and plots can be acessed from an accompanying Onedrive with the author's permission.
 
 ## Ideas for future analyses
 
@@ -39,7 +39,7 @@ Further documentation, the data itself and any outputs of this script such as ta
 
 # Setup
 
-Loading necessary packages for analysis. Mainly tidyverse for overall functionality, haven for importing .SAV data, and lme4 with marginaleffects and broom to obtain interpretable model outputs.
+I load the necessary packages for analysis. Mainly tidyverse for overall functionality, haven for importing .SAV data, and lme4 with marginaleffects and broom to obtain interpretable model outputs.
 
 ```{r libraries}
 #| message: false
@@ -152,7 +152,7 @@ parents_raw <- read_sav(paste0(data_path, "/original_data.sav")) |>
 
 Raw data is in a wide format - one respondent and their 6 vignette ratings per row. The analysis requires data in a long format - one vignette rating per row.
 
-A sizable chunk of respondents rated vignettes due to a fault in the randomisation procedure. Nevertheless, I decided to keep them since randomisation with replacement shouldn't violate any of the assumptions behind this analysis, hence they bolster the overall sample size. Technically they rated "new vignettes" that differed in assigned names, but all the substantive component levels remained the same. It It is possible to filter them out by simply adding "filter(stejne == 0)" to the pipe.
+A sizable chunk of respondents rated vignettes due to a fault in the randomisation procedure. Nevertheless, I decided to keep them, since randomisation with replacement shouldn't violate any of the assumptions behind this analysis, hence they bolster the overall sample size. Technically they rated "new vignettes" that differed in assigned names, but all the substantive component levels remained the same. It is possible to filter them out by simply adding "filter(stejne == 0)" to the pipe.
 
 ```{r data-cleaning}
 #| message: false
