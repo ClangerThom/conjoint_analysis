@@ -4,9 +4,9 @@
 if (file.exists("C:/Users/Admin/OneDrive/r")) {
   # Computer 1 - adjust this path to match your actual OneDrive location
   onedrive_base <- "C:/Users/Admin/OneDrive/r"
-} else if (file.exists("D:/OneDrive/Thomas - Personal")) {
+} else if (file.exists("C:/Users/Admin/OneDrive/r")) {
   # Computer 2 - adjust this path when you set up your second computer
-  onedrive_base <- "D:/OneDrive/Thomas - Personal"
+  onedrive_base <- "C:/Users/Admin/OneDrive/r"
 } else {
   stop("OneDrive path not recognized. Please update config.R with the correct path for this computer.")
 }
