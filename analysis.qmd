@@ -847,9 +847,10 @@ m_interaction_woman_plotting |>
   labs(
     x = "Average change on an 11 point scale in comparison to\nreference category",
     y = NULL,
-    title = "AMCEs derived from linear mixed effect model\nwith individual respondent random intercepts",
+    title = "Perceptions of parental readiness by gender\n(interaction of vignette gender and components)",
     color = "Gender of vignette"
   ) +
+  scale_color_manual(values = c("turquoise", "coral"))+
   facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
   plotting_variable_labs +
   theme(legend.position = "top")
