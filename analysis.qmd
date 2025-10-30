@@ -425,9 +425,9 @@ m_interaction_r_parent <- lmer(
   data = parents_long
 )
 
-# by level of income in vignette
+# by level of income in vignette (excluding vignette gender)
 m_interaction_income <- lmer(
-  q1rec ~ (vpoh + vpar + vbyt + vskol_fix + vzam) * vplat
+  q1rec ~ vpoh + (vpar + vbyt + vskol_fix + vzam) * vplat
   + factor(vignette)
   + parent + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
   + (1 | id), # respondent random intercepts
