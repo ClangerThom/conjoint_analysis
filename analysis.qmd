@@ -427,7 +427,7 @@ m_interaction_r_parent <- lmer(
 
 # by level of income in vignette (excluding vignette gender)
 m_interaction_income <- lmer(
-  q1rec ~ vpoh + (vpar + vbyt + vskol_fix + vzam) * vplat
+  q1rec ~ (vpoh + vpar + vbyt + vskol_fix + vzam) * vplat
   + factor(vignette)
   + parent + economic_activity + sex + edu_rec + s_4 + s_7 + size + reg + age_kat
   + (1 | id), # respondent random intercepts
@@ -786,7 +786,7 @@ model_contrasts |>
 #| message: false
 #| code-fold: true
 
-components <- c("vpar", "vbyt", "vskol_fix", "vzam", "vplat")
+components <- c("vpoh", "vpar", "vbyt", "vskol_fix", "vzam", "vplat")
 
 sex_mfx <- m_interaction_woman |> 
   avg_slopes(
@@ -814,7 +814,7 @@ m_interaction_woman_plotting <- model_variable_levels |>
   ) |> 
   left_join(variable_lookup, by = join_by(variable)) |> 
   mutate(across(c(levels, variable_nice), ~fct_inorder(.))) |> 
-  filter(variable != "vpoh") |> 
+  #filter(variable != "vpoh") |> 
   mutate(vpoh = case_when(
     is.na(reference_level) ~ "Muž",
     .default = vpoh
@@ -847,7 +847,7 @@ m_interaction_woman_plotting |>
   labs(
     x = "Average change on an 11 point scale in comparison to\nreference category",
     y = NULL,
-    title = "Perceptions of parental readiness by gender\n(interaction of vignette gender and components)",
+    #title = "Perceptions of parental readiness by gender\n(interaction of vignette gender and components)",
     color = "Gender of vignette"
   ) +
   scale_color_manual(values = c("turquoise", "coral"))+
@@ -864,6 +864,89 @@ In this block I export the result to my Onedrive.
 #| code-fold: true
 
 ggsave("q1_woman_interaction_AMCE.png", bg = "white",
+       width = 15, height = 17.8, units = "cm",
+       path = output_plots)
+```
+
+## AMCE plot for Q1 interaction between components and income (excluding sex)
+
+```{r data-wrangling-interaction-plot-income}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
+components <- c("vpoh", "vpar", "vbyt", "vskol_fix", "vzam", "vplat")
+
+income_mfx <- m_interaction_income |> 
+  avg_slopes(
+    variables = components,
+    by = "vplat",
+    re.form = NULL
+  ) |> 
+  separate_wider_delim(
+    contrast,
+    delim = " - ",
+    names = c("variable_level", "reference_level")
+  )
+
+m_interaction_income_plotting <- model_variable_levels |> 
+  left_join(
+    income_mfx,
+    by = join_by(variable == term, levels == variable_level)
+  ) |> 
+  # Make these zero
+  mutate(
+    across(
+      c(estimate, conf.low, conf.high),
+      ~ ifelse(is.na(.x), 0, .x)
+    )
+  ) |> 
+  left_join(variable_lookup, by = join_by(variable)) |> 
+  mutate(across(c(levels, variable_nice), ~fct_inorder(.))) |> 
+  mutate(vplat = case_when(
+    is.na(reference_level) ~ "39.000 Kč",
+    .default = vplat
+  ))
+```
+
+## Plotting
+
+```{r plot-interaction-income}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
+m_interaction_income_plotting |> 
+  
+  # this is here just to get the order of the wages correct on the plot
+  mutate(levels = fct_relevel(levels, "19.500 Kč", "39.000 Kč", "58.500 Kč")) |> 
+  
+  # Actual plotting hapenning here
+  ggplot(
+    aes(x = estimate, y = levels, color = vplat)
+  ) +
+  geom_vline(xintercept = 0) +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
+                  position = position_dodge(width = 0.5)) +
+  labs(
+    x = "Average change on an 11 point scale in comparison to\nreference category",
+    y = NULL,
+    color = "Income level"
+  ) +
+  facet_col(facets = "variable_nice", scales = "free_y", space = "free") +
+  plotting_variable_labs +
+  theme(legend.position = "top")
+
+```
+
+Export to onedrive
+
+```{r export-interaction-plot-income}
+#| warnings: false
+#| message: false
+#| code-fold: true
+
+ggsave("q1_income_interaction_AMCE.png", bg = "white",
        width = 15, height = 17.8, units = "cm",
        path = output_plots)
 ```
